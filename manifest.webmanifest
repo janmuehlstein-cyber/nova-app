@@ -1,0 +1,17 @@
+{
+  "name": "NOVA – Personal Assistant",
+  "short_name": "NOVA",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#101116",
+  "theme_color": "#101116",
+  "description": "Dein lokaler persönlicher Assistent",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
