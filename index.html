@@ -49,7 +49,14 @@
       </section>
 
       <section class="panel" id="calendarPanel">
-        <div class="section-heading"><div><div class="eyebrow">DEINE ORGANISATION</div><h2>Kalender</h2></div><span class="pill">Dieses Gerät</span></div>
+        <div class="section-heading"><div><div class="eyebrow">DEINE ORGANISATION</div><h2>Kalender</h2></div><span class="pill" id="calendarSourcePill">NOVA · Lokal</span></div>
+        <div class="calendar-connect-card">
+          <div class="connect-top"><div class="apple-mark">●</div><div class="connect-copy"><strong>Apple Kalender</strong><p>Termine aus deinem Apple-Kalender in NOVA übernehmen oder NOVA-Termine exportieren.</p></div><span class="pill">ICS</span></div>
+          <div class="row calendar-actions"><button class="secondary-btn" type="button" id="importCalendarBtn">Apple-Kalender importieren</button><button class="secondary-btn" type="button" id="exportCalendarBtn">NOVA exportieren</button></div>
+          <input id="calendarFileInput" class="file-input" type="file" accept=".ics,text/calendar" aria-label="Apple-Kalenderdatei auswählen">
+          <p class="hint connect-note" id="calendarSyncNote">Dateiübertragung · keine automatische Live-Synchronisierung</p>
+          <div class="connect-help">Wähle eine zuvor aus iCloud.com oder der Kalender-App auf dem Mac exportierte .ics-Datei aus. Auf dem iPhone kannst du die Datei über „Dateien“ auswählen.</div>
+        </div>
         <div class="calendar-card">
           <div class="calendar-date"><span class="eyebrow">HEUTE</span><strong id="calendarToday"></strong></div>
           <div id="eventList" class="event-list"></div>
@@ -60,7 +67,7 @@
           <div class="row"><input id="eventDate" type="date" required><input id="eventTime" type="time"></div>
           <button class="primary-btn" type="submit">Termin speichern <span>＋</span></button>
         </form>
-        <p class="hint footnote">Termine werden vorerst nur in NOVA gespeichert – nicht automatisch mit Apple Kalender synchronisiert.</p>
+        <p class="hint footnote">Importierte Termine werden lokal in NOVA gespeichert. Änderungen werden nicht automatisch zwischen beiden Kalendern abgeglichen.</p>
       </section>
 
       <section class="panel" id="settingsPanel">
@@ -69,7 +76,7 @@
         <div class="setting-card"><div><strong>Datenschutz</strong><p>Lokale Verarbeitung und Speicherung im Browser.</p></div><span class="pill green">Lokal</span></div>
         <div class="setting-card"><div><strong>Nachrichtenverlauf</strong><p>NOVA speichert in dieser Version keine analysierten Nachrichten.</p></div></div>
         <button class="danger-btn" id="clearDataBtn">Alle NOVA-Termine löschen</button>
-        <p class="hint footnote">MVP-Version 0.1 · Die Analyse arbeitet aktuell mit einfachen lokalen Regeln, nicht mit einem KI-Sprachmodell.</p>
+        <p class="hint footnote">MVP-Version 0.3 · Apple-Kalender-Import und -Export über das offene .ics-Format. Keine Zugangsdaten erforderlich.</p>
       </section>
     </main>
     <footer> <span>NOVA</span><span>Einfach. Persönlich. Privat.</span></footer>
