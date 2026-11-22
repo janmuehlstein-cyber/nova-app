@@ -1,52 +1,86 @@
-function handleNovaResponse(userText) {
-        const lowerText = userText.toLowerCase();
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101116">
+  <meta name="description" content="NOVA – dein lokaler persönlicher Assistent">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <title>NOVA</title>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand"><div class="brand-mark">N</div><div><div class="brand-name">NOVA</div><div class="brand-sub">PERSONAL ASSISTANT</div></div></div>
+      <div class="status"><span class="status-dot"></span> Lokal aktiv</div>
+    </header>
 
-        // 1. Prüfen, ob es sich um einen Termin/Anfrage handelt
-        const isAppointmentQuery = lowerText.includes('termin') || 
-                                   lowerText.includes('morgen') || 
-                                   lowerText.includes('heute') || 
-                                   lowerText.includes('montag') || 
-                                   lowerText.includes('dienstag') || 
-                                   lowerText.includes('mittwoch') || 
-                                   lowerText.includes('donnerstag') || 
-                                   lowerText.includes('freitag') || 
-                                   lowerText.includes('samstag') || 
-                                   lowerText.includes('sonntag') || 
-                                   lowerText.includes('uhr') ||
-                                   lowerText.includes('wann') ||
-                                   lowerText.includes('25.11') ||
-                                   lowerText.includes('november');
+    <main>
+      <section class="welcome">
+        <div class="eyebrow">DEIN ASSISTENT</div>
+        <h1>Was steht heute an?</h1>
+        <p>Ich helfe dir, Nachrichten und deinen Tag besser zu organisieren.</p>
+        <div class="date-line" id="todayLine"></div>
+      </section>
 
-        if (isAppointmentQuery) {
-            // Wir suchen im Kalender, ob ein Event existiert, das zum Datum passt (z.B. "2026-11-25")
-            // Für den Test prüfen wir, ob "25.11" oder "25" im Text steht und mit dem Event-Datum übereinstimmt
-            const conflictingEvent = events.find(event => {
-                // Prüft ob das Datum übereinstimmt (z.B. '2026-11-25' enthält '11-25' oder '25')
-                if (lowerText.includes('25.11') && event.date.includes('11-25')) {
-                    return true;
-                }
-                // Allgemeine Datumserkennung (falls ein anderes Datum genannt wird)
-                if (event.date && lowerText.includes(event.date)) {
-                    return true;
-                }
-                return false;
-            });
+      <nav class="tabs" aria-label="Hauptnavigation">
+        <button class="tab active" data-tab="messages">Nachrichten</button>
+        <button class="tab" data-tab="calendar">Kalender</button>
+        <button class="tab" data-tab="settings">Einstellungen</button>
+      </nav>
 
-            // Wenn NOVA ein passendes Event an dem Tag findet -> Absagen/Sagen dass schon was da ist
-            if (conflictingEvent) {
-                return `Nächsten Mittwoch hab ich was vor (${conflictingEvent.title} um ${conflictingEvent.time} Uhr).`;
-            } else {
-                // Wenn kein Termin an dem Tag gefunden wurde -> Zusagen
-                return `An dem Tag passt es gut, da habe ich noch nichts vor!`;
-            }
-        }
+      <section class="panel active" id="messagesPanel">
+        <div class="section-heading"><div><div class="eyebrow">NOVA INTELLIGENCE</div><h2>Nachricht analysieren</h2></div><span class="pill">Privat · Lokal</span></div>
+        <label for="messageInput">Nachricht einfügen</label>
+        <textarea id="messageInput" rows="5" placeholder="Füge hier eine Nachricht ein, auf die du antworten möchtest …"></textarea>
+        <div class="row between small-row"><span class="hint">Die Nachricht wird nur in diesem Browser verarbeitet.</span><span class="counter" id="charCount">0 Zeichen</span></div>
+        <button class="primary-btn" id="analyzeBtn">Nachricht analysieren <span>↗</span></button>
 
-        // 2. Standard-Antworten für andere Themen
-        if (lowerText.includes('hallo') || lowerText.includes('hi')) {
-            return 'Hallo! Schön, von dir zu hören. Was kann ich für dich tun?';
-        } else if (lowerText.includes('wie geht es dir')) {
-            return 'Mir geht es als NOVA hervorragend und ich bin bereit dir zu helfen!';
-        } else {
-            return 'Alles klar, ich habe mir das angeschaut und halte dich auf dem Laufenden!';
-        }
-    }
+        <div class="result hidden" id="result">
+          <div class="result-top"><div><div class="eyebrow">ANALYSE</div><h3 id="analysisTitle">Einordnung</h3></div><span class="pill" id="categoryPill">Allgemein</span></div>
+          <p id="analysisText" class="analysis-copy"></p>
+          <div class="suggestion-head"><h3>Antwortvorschlag</h3><span class="hint">Hybrid-Stil</span></div>
+          <div class="suggestion" id="suggestionText"></div>
+          <div class="row action-row"><button class="secondary-btn" id="copyBtn">Text kopieren</button><button class="text-btn" id="editBtn">Nachricht ändern</button></div>
+        </div>
+        <div class="privacy-note"><span class="lock">◈</span><div><strong>Deine Daten bleiben bei dir.</strong><br><span>Dieses MVP nutzt lokale Regeln und speichert keine Nachrichten dauerhaft.</span></div></div>
+      </section>
+
+      <section class="panel" id="calendarPanel">
+        <div class="section-heading"><div><div class="eyebrow">DEINE ORGANISATION</div><h2>Kalender</h2></div><span class="pill" id="calendarSourcePill">NOVA · Lokal</span></div>
+        <div class="calendar-connect-card">
+          <div class="connect-top"><div class="apple-mark">●</div><div class="connect-copy"><strong>Apple Kalender</strong><p>Termine aus deinem Apple-Kalender in NOVA übernehmen oder NOVA-Termine exportieren.</p></div><span class="pill">ICS</span></div>
+          <div class="row calendar-actions"><button class="secondary-btn" type="button" id="importCalendarBtn">Apple-Kalender importieren</button><button class="secondary-btn" type="button" id="exportCalendarBtn">NOVA exportieren</button></div>
+          <input id="calendarFileInput" class="file-input" type="file" accept=".ics,text/calendar" aria-label="Apple-Kalenderdatei auswählen">
+          <p class="hint connect-note" id="calendarSyncNote">Dateiübertragung · keine automatische Live-Synchronisierung</p>
+          <div class="connect-help">Wähle eine zuvor aus iCloud.com oder der Kalender-App auf dem Mac exportierte .ics-Datei aus. Auf dem iPhone kannst du die Datei über „Dateien“ auswählen.</div>
+        </div>
+        <div class="calendar-card">
+          <div class="calendar-date"><span class="eyebrow">HEUTE</span><strong id="calendarToday"></strong></div>
+          <div id="eventList" class="event-list"></div>
+        </div>
+        <h3 class="subheading">Termin hinzufügen</h3>
+        <form id="eventForm" class="event-form">
+          <input id="eventTitle" type="text" maxlength="70" placeholder="Was steht an?" required>
+          <div class="row"><input id="eventDate" type="date" required><input id="eventTime" type="time"></div>
+          <button class="primary-btn" type="submit">Termin speichern <span>＋</span></button>
+        </form>
+        <p class="hint footnote">Importierte Termine werden lokal in NOVA gespeichert. Änderungen werden nicht automatisch zwischen beiden Kalendern abgeglichen.</p>
+      </section>
+
+      <section class="panel" id="settingsPanel">
+        <div class="section-heading"><div><div class="eyebrow">PERSÖNLICH</div><h2>Einstellungen</h2></div></div>
+        <div class="setting-card"><div><strong>Schreibstil</strong><p>Natürlich, klar und situationsgerecht.</p></div><span class="pill">Hybrid</span></div>
+        <div class="setting-card"><div><strong>Datenschutz</strong><p>Lokale Verarbeitung und Speicherung im Browser.</p></div><span class="pill green">Lokal</span></div>
+        <div class="setting-card"><div><strong>Nachrichtenverlauf</strong><p>NOVA speichert in dieser Version keine analysierten Nachrichten.</p></div></div>
+        <button class="danger-btn" id="clearDataBtn">Alle NOVA-Termine löschen</button>
+        <p class="hint footnote">MVP-Version 0.3 · Apple-Kalender-Import und -Export über das offene .ics-Format. Keine Zugangsdaten erforderlich.</p>
+      </section>
+    </main>
+    <footer> <span>NOVA</span><span>Einfach. Persönlich. Privat.</span></footer>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>
