@@ -81,6 +81,61 @@
     </main>
     <footer> <span>NOVA</span><span>Einfach. Persönlich. Privat.</span></footer>
   </div>
-  <script handleNovaResponse/script>
+  <script>
+    // 1. Deine Termine
+    const events = [
+        {
+            title: "Arzttermin",
+            date: "2026-11-25",
+            time: "15:00"
+        }
+    ];
+
+    // 2. Deine Logik für die automatische Prüfung und Absage
+    function handleNovaResponse(userText) {
+        const lowerText = userText.toLowerCase();
+
+        const isAppointmentQuery = lowerText.includes('termin') || 
+                                   lowerText.includes('morgen') || 
+                                   lowerText.includes('heute') || 
+                                   lowerText.includes('montag') || 
+                                   lowerText.includes('dienstag') || 
+                                   lowerText.includes('mittwoch') || 
+                                   lowerText.includes('donnerstag') || 
+                                   lowerText.includes('freitag') || 
+                                   lowerText.includes('samstag') || 
+                                   lowerText.includes('sonntag') || 
+                                   lowerText.includes('uhr') ||
+                                   lowerText.includes('wann') ||
+                                   lowerText.includes('25.11') ||
+                                   lowerText.includes('november');
+
+        if (isAppointmentQuery) {
+            const conflictingEvent = events.find(event => {
+                if (lowerText.includes('25.11') && event.date.includes('11-25')) {
+                    return true;
+                }
+                if (event.date && lowerText.includes(event.date)) {
+                    return true;
+                }
+                return false;
+            });
+
+            if (conflictingEvent) {
+                return `Nächsten Mittwoch hab ich was vor (${conflictingEvent.title} um ${conflictingEvent.time} Uhr).`;
+            } else {
+                return `An dem Tag passt es gut, da habe ich noch nichts vor!`;
+            }
+        }
+
+        if (lowerText.includes('hallo') || lowerText.includes('hi')) {
+            return 'Hallo! Schön, von dir zu hören. Was kann ich für dich tun?';
+        } else if (lowerText.includes('wie geht es dir')) {
+            return 'Mir geht es als NOVA hervorragend und ich bin bereit dir zu helfen!';
+        } else {
+            return 'Alles klar, ich habe mir das angeschaut und halte dich auf dem Laufenden!';
+        }
+    }
+</script>
 </body>
 </html>
