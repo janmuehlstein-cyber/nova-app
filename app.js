@@ -1,320 +1,337 @@
-const $ = (id) => document.getElementById(id);
+// NOVA WebApp MVP - app.js mit intelligenter Kalenderprüfung
 
-const dateFmt = new Intl.DateTimeFormat('de-DE', {
-  weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
-});
-const shortDateFmt = new Intl.DateTimeFormat('de-DE', {
-  day: '2-digit', month: '2-digit', year: 'numeric'
-});
+document.addEventListener('DOMContentLoaded', () => {
+    // DOM Elements
+    const chatMessages = document.getElementById('chat-messages');
+    const userInput = document.getElementById('user-input');
+    const sendButton = document.getElementById('send-btn');
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const tabContents = document.querySelectorAll('.tab-content');
+    
+    // Calendar DOM Elements
+    const calendarMonthYear = document.getElementById('calendar-month-year');
+    const calendarGrid = document.getElementById('calendar-grid');
+    const prevMonthBtn = document.getElementById('prev-month');
+    const nextMonthBtn = document.getElementById('next-month');
+    const eventList = document.getElementById('event-list');
+    const addEventBtn = document.getElementById('add-event-btn');
+    
+    // Modal Elements
+    const eventModal = document.getElementById('event-modal');
+    const closeModalBtn = document.querySelector('.close-btn');
+    const eventForm = document.getElementById('event-form');
+    const eventTitleInput = document.getElementById('event-title');
+    const eventDateInput = document.getElementById('event-date');
+    const eventTimeInput = document.getElementById('event-time');
 
-// Use local calendar dates instead of UTC dates to avoid off-by-one errors.
-function toLocalDateValue(date = new Date()) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
+    // App State
+    let messages = [
+        { id: 1, sender: 'nova', text: 'Hallo! Ich bin NOVA, deine smarte Assistenz. Wie kann ich dir heute helfen?', time: getCurrentTime() }
+    ];
 
-const today = new Date();
-$('todayLine').textContent = dateFmt.format(today);
-$('calendarToday').textContent = shortDateFmt.format(today);
-$('eventDate').value = toLocalDateValue(today);
+    let events = loadEvents();
+    let currentDate = new Date();
 
-document.querySelectorAll('.tab').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.tab').forEach(tab => {
-      const active = tab === btn;
-      tab.classList.toggle('active', active);
-      tab.setAttribute('aria-selected', String(active));
+    // Initialize App
+    initChat();
+    initCalendar();
+
+    // --- TAB NAVIGATION ---
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const targetTab = btn.getAttribute('data-tab');
+            
+            tabBtns.forEach(b => b.classList.remove('active'));
+            tabContents.forEach(c => c.classList.remove('active'));
+            
+            btn.classList.add('active');
+            document.getElementById(targetTab).classList.add('active');
+            
+            if (targetTab === 'calendar') {
+                renderCalendar();
+            }
+        });
     });
-    document.querySelectorAll('.panel').forEach(panel => panel.classList.remove('active'));
-    const panel = $(btn.dataset.tab + 'Panel');
-    if (panel) panel.classList.add('active');
-  });
-});
 
-$('messageInput').addEventListener('input', event => {
-  $('charCount').textContent = `${event.target.value.length} Zeichen`;
-  $('result').classList.add('hidden');
-});
+    // --- CHAT LOGIC ---
+    function initChat() {
+        renderMessages();
+        
+        sendButton.addEventListener('click', handleSendMessage);
+        userInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                handleSendMessage();
+            }
+        });
+    }
 
-function analyzeMessage(raw) {
-  const s = raw.toLocaleLowerCase('de-DE');
-  const hasQuestion = /\\?|kannst du|könntest du|weißt du|wann|wo/.test(s);
-  const urgent = /dringend|sofort|jetzt|wichtig|problem|hilfe/.test(s);
-  const emotional = /traurig|enttäuscht|verletzt|liebe|vermiss|streit|sauer|wütend|tut mir leid/.test(s);
-  const scheduling = /heute|morgen|uhr|treffen|zeit|termin|schule|training|später/.test(s);
+    function renderMessages() {
+        chatMessages.innerHTML = '';
+        messages.forEach(msg => {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message', msg.sender);
+            
+            messageDiv.innerHTML = `
+                <div class="message-bubble">
+                    <p>${escapeHTML(msg.text)}</p>
+                    <span class="message-time">${msg.time}</span>
+                </div>
+            `;
+            chatMessages.appendChild(messageDiv);
+        });
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
 
-  let category = 'Allgemein';
-  let title = 'Sachliche Nachricht';
-  let note = 'Die Nachricht wirkt zunächst wie eine normale Unterhaltung. Eine kurze, klare Antwort passt wahrscheinlich gut.';
-  let reply = 'Alles klar, danke dir für die Nachricht!';
+    function handleSendMessage() {
+        const text = userInput.value.trim();
+        if (!text) return;
 
-  if (emotional) {
-    category = 'Persönlich';
-    title = 'Persönliches Thema';
-    note = 'Hier geht es möglicherweise um Gefühle oder eine persönliche Situation. Antworte aufmerksam und vermeide eine vorschnelle oder automatische Zusage.';
-    reply = 'Danke, dass du mir das sagst. Ich möchte darauf eingehen und in Ruhe darüber sprechen.';
-  } else if (urgent) {
-    category = 'Dringend';
-    title = 'Möglicherweise wichtig';
-    note = 'Die Nachricht enthält Hinweise auf Zeitdruck oder ein Problem. Prüfe den Inhalt selbst, bevor du antwortest.';
-    reply = 'Ich habe deine Nachricht gesehen. Ich kümmere mich darum und melde mich so bald wie möglich.';
-  } else if (scheduling) {
-    category = 'Termin / Planung';
-    title = 'Organisatorische Nachricht';
-    note = 'Es geht wahrscheinlich um Zeitplanung oder einen Termin. Prüfe deinen Kalender, bevor du eine feste Zeit bestätigst.';
-    reply = 'Danke! Ich schaue kurz in meinen Kalender und gebe dir dann Bescheid, welche Zeit bei mir passt.';
-  } else if (hasQuestion) {
-    category = 'Frage';
-    title = 'Eine Antwort wird erwartet';
-    note = 'Die Person stellt vermutlich eine konkrete Frage. Beantworte sie direkt, wenn du die nötigen Informationen hast.';
-    reply = 'Gute Frage – ich prüfe das kurz und gebe dir Bescheid.';
-  }
+        // User message hinzufügen
+        messages.push({
+            id: Date.now(),
+            sender: 'user',
+            text: text,
+            time: getCurrentTime()
+        });
 
-  return { category, title, note, reply };
-}
+        userInput.value = '';
+        renderMessages();
 
-$('analyzeBtn').addEventListener('click', () => {
-  const raw = $('messageInput').value.trim();
-  if (!raw) {
-    $('messageInput').focus();
-    $('messageInput').setAttribute('aria-invalid', 'true');
-    return;
-  }
-  $('messageInput').removeAttribute('aria-invalid');
+        // NOVA denkt nach... Antwort generieren
+        setTimeout(() => {
+            const novaReply = handleNovaResponse(text);
+            messages.push({
+                id: Date.now() + 1,
+                sender: 'nova',
+                text: novaReply,
+                time: getCurrentTime()
+            });
+            renderMessages();
+            renderEventsList(); // Falls durch den Chat ein Event erstellt wurde
+        }, 600);
+    }
 
-  const analysis = analyzeMessage(raw);
-  $('analysisTitle').textContent = analysis.title;
-  $('categoryPill').textContent = analysis.category;
-  $('analysisText').textContent = analysis.note;
-  $('suggestionText').textContent = analysis.reply;
-  $('result').classList.remove('hidden');
-  $('result').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-});
+    // --- INTELLIGENTE NOVA ANTWORT & KALENDER-ABGLEICH ---
+    function handleNovaResponse(userText) {
+        const lowerText = userText.toLowerCase();
 
-$('copyBtn').addEventListener('click', async () => {
-  const text = $('suggestionText').textContent;
-  try {
-    if (!navigator.clipboard?.writeText) throw new Error('Clipboard API unavailable');
-    await navigator.clipboard.writeText(text);
-    $('copyBtn').textContent = 'Kopiert ✓';
-    window.setTimeout(() => { $('copyBtn').textContent = 'Text kopieren'; }, 1600);
-  } catch {
-    $('copyBtn').textContent = 'Bitte Text markieren';
-  }
-});
+        // 1. Prüfen, ob es sich um einen Termin/Anfrage handelt
+        const isAppointmentQuery = lowerText.includes('termin') || 
+                                   lowerText.includes('morgen') || 
+                                   lowerText.includes('heute') || 
+                                   lowerText.includes('montag') || 
+                                   lowerText.includes('dienstag') || 
+                                   lowerText.includes('mittwoch') || 
+                                   lowerText.includes('donnerstag') || 
+                                   lowerText.includes('freitag') || 
+                                   lowerText.includes('samstag') || 
+                                   lowerText.includes('sonntag') || 
+                                   lowerText.includes('uhr') ||
+                                   lowerText.includes('wann');
 
-$('editBtn').addEventListener('click', () => $('messageInput').focus());
+        if (isAppointmentQuery) {
+            // Versuche ein Datum aus dem Text zu filtern (vereinfachte MVP-Prüfung)
+            // Wir prüfen, ob bereits Events in unserem NOVA-Kalender eingetragen sind
+            const conflictingEvents = events.filter(event => {
+                const eventTitleLower = event.title.toLowerCase();
+                // Prüfen ob Wochentage oder Begriffe übereinstimmen
+                const days = ['montag', 'dienstag', 'mittwoch', 'donnerstag', 'freitag', 'samstag', 'sonntag', 'morgen', 'heute'];
+                for (let day of days) {
+                    if (lowerText.includes(day) && (event.date.includes(day) || eventTitleLower.includes(day))) {
+                        return true;
+                    }
+                }
+                return false;
+            });
 
-const KEY = 'nova_events_v1';
-
-// Apple Calendar bridge: import and export standard iCalendar (.ics) files.
-function icsUnescape(value) {
-  return value.replace(/\\n/gi, '\n').replace(/\\,/g, ',').replace(/\\;/g, ';').replace(/\\\\/g, '\\');
-}
-function icsEscape(value) {
-  return String(value).replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/,/g, '\\,').replace(/;/g, '\\;');
-}
-function unfoldIcs(text) {
-  return text.replace(/\r?\n[ \t]/g, '').split(/\r?\n/);
-}
-function parseIcsDate(line) {
-  if (!line) return null;
-  const parts = line.split(':');
-  const meta = parts.shift();
-  const value = parts.join(':').trim();
-  const dateOnly = /VALUE=DATE/.test(meta) || /^\d{8}$/.test(value);
-  if (dateOnly) return { date: `${value.slice(0,4)}-${value.slice(4,6)}-${value.slice(6,8)}`, time: '' };
-  const match = value.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})?(Z)?$/);
-  if (!match) return null;
-  if (match[7]) {
-    const utc = new Date(Date.UTC(+match[1], +match[2]-1, +match[3], +match[4], +match[5], +(match[6] || 0)));
-    return { date: toLocalDateValue(utc), time: `${String(utc.getHours()).padStart(2,'0')}:${String(utc.getMinutes()).padStart(2,'0')}` };
-  }
-  return { date: `${match[1]}-${match[2]}-${match[3]}`, time: `${match[4]}:${match[5]}` };
-}
-function parseIcsEvents(text) {
-  const lines = unfoldIcs(text);
-  const events = [];
-  let current = null;
-  for (const line of lines) {
-    if (line === 'BEGIN:VEVENT') { current = {}; continue; }
-    if (line === 'END:VEVENT') {
-      if (current?.SUMMARY && current?.DTSTART) {
-        const parsed = parseIcsDate(current.DTSTART);
-        if (parsed && /^\d{4}-\d{2}-\d{2}$/.test(parsed.date)) {
-          events.push({ id: current.UID || `ics-${Date.now()}-${events.length}`, title: icsUnescape(current.SUMMARY).slice(0,70), ...parsed, imported: true });
+            // Wenn Kollisionen da sind oder Termine an dem Tag existieren
+            if (conflictingEvents.length > 0 || events.length > 0 && lowerText.includes('zeit')) {
+                return `Da habe ich leider schon was vor (${conflictingEvents[0]?.title || 'bereits ein Termin eingetragen'}).`;
+            } else {
+                // Natürlich wirkende positive Antwort
+                // Extrahiere Wochentag falls vorhanden für die Antwort
+                let dayString = "Das";
+                const foundDay = ['nächsten montag', 'nächsten dienstag', 'nächsten mittwoch', 'nächsten donnerstag', 'nächsten freitag', 'morgen', 'heute'].find(d => lowerText.includes(d));
+                
+                if (foundDay) {
+                    return `${foundDay.charAt(0).toUpperCase() + foundDay.slice(1)} passt gut, da hab ich noch nichts vor!`;
+                }
+                return "Das passt zeitlich gut bei mir, ich habe nichts im Kalender stehen.";
+            }
         }
-      }
-      current = null; continue;
+
+        // 2. Standard-Antworten für andere Themen
+        if (lowerText.includes('hallo') || lowerText.includes('hi')) {
+            return 'Hallo! Schön, von dir zu hören. Was kann ich für dich tun?';
+        } else if (lowerText.includes('wie geht es dir')) {
+            return 'Mir geht es als NOVA hervorragend und ich bin bereit dir zu helfen!';
+        } else {
+            // Fallback
+            return 'Alles klar, ich habe mir das Notierte angeschaut und halte dich auf dem Laufenden!';
+        }
     }
-    if (!current) continue;
-    const colon = line.indexOf(':');
-    if (colon < 0) continue;
-    const key = line.slice(0, colon).split(';')[0].toUpperCase();
-    if (['UID','SUMMARY','DTSTART'].includes(key)) current[key] = line.slice(colon+1);
-  }
-  return events;
-}
-function downloadIcs() {
-  const events = getEvents();
-  const stamp = new Date().toISOString().replace(/[-:]/g,'').replace(/\.\d{3}/,'');
-  const lines = ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//NOVA//Personal Calendar 0.3//DE','CALSCALE:GREGORIAN','METHOD:PUBLISH'];
-  for (const event of events) {
-    const uid = `${event.id}@nova.local`;
-    const start = event.date.replace(/-/g,'') + (event.time ? `T${event.time.replace(':','')}00` : '');
-    const endDate = event.date.replace(/-/g,'');
-    lines.push('BEGIN:VEVENT',`UID:${uid}`,`DTSTAMP:${stamp}`,`DTSTART${event.time ? '' : ';VALUE=DATE'}:${start}`,`SUMMARY:${icsEscape(event.title)}`,'END:VEVENT');
-  }
-  lines.push('END:VCALENDAR');
-  const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a'); link.href = url; link.download = 'NOVA-Kalender.ics';
-  document.body.append(link); link.click(); link.remove(); URL.revokeObjectURL(url);
-  $('calendarSyncNote').textContent = `${events.length} NOVA-Termin(e) als .ics exportiert. Öffne die Datei mit Apple Kalender.`;
-}
-$('importCalendarBtn').addEventListener('click', () => $('calendarFileInput').click());
-$('calendarFileInput').addEventListener('change', async event => {
-  const file = event.target.files?.[0];
-  if (!file) return;
-  try {
-    const imported = parseIcsEvents(await file.text());
-    if (!imported.length) { alert('In dieser Datei wurden keine unterstützten Termine gefunden.'); return; }
-    const existing = getEvents();
-    const seen = new Set(existing.map(item => `${item.title}|${item.date}|${item.time || ''}`));
-    let added = 0;
-    for (const item of imported) {
-      const fingerprint = `${item.title}|${item.date}|${item.time || ''}`;
-      if (seen.has(fingerprint)) continue;
-      existing.push({ id: globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`, title: item.title, date: item.date, time: item.time || '' });
-      seen.add(fingerprint); added++;
+
+    // --- CALENDAR LOGIC ---
+    function initCalendar() {
+        renderCalendar();
+        renderEventsList();
+
+        prevMonthBtn.addEventListener('click', () => {
+            currentDate.setMonth(currentDate.getMonth() - 1);
+            renderCalendar();
+        });
+
+        nextMonthBtn.addEventListener('click', () => {
+            currentDate.setMonth(currentDate.getMonth() + 1);
+            renderCalendar();
+        });
+
+        addEventBtn.addEventListener('click', () => {
+            eventModal.style.display = 'block';
+            eventDateInput.value = new Date().toISOString().split('T')[0];
+        });
+
+        closeBtn.addEventListener('click', () => {
+            eventModal.style.display = 'none';
+        });
+
+        window.addEventListener('click', (e) => {
+            if (e.target === eventModal) {
+                eventModal.style.display = 'none';
+            }
+        });
+
+        eventForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const newEvent = {
+                id: Date.now(),
+                title: eventTitleInput.value,
+                date: eventDateInput.value,
+                time: eventTimeInput.value || '00:00'
+            };
+
+            events.push(newEvent);
+            saveEvents(events);
+            
+            eventModal.style.display = 'none';
+            eventForm.reset();
+            renderCalendar();
+            renderEventsList();
+        });
     }
-    if (saveEvents(existing)) $('calendarSyncNote').textContent = `${added} Termin(e) importiert · ${imported.length-added} Duplikat(e) übersprungen.`;
-  } catch { alert('Die Kalenderdatei konnte nicht gelesen werden. Bitte verwende eine gültige .ics-Datei.'); }
-  event.target.value = '';
+
+    function renderCalendar() {
+        const year = currentDate.getFullYear();
+        const month = currentDate.getMonth();
+
+        const monthNames = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
+        calendarMonthYear.textContent = `${monthNames[month]} ${year}`;
+
+        calendarGrid.innerHTML = `
+            <div class="day-name">Mo</div>
+            <div class="day-name">Di</div>
+            <div class="day-name">Mi</div>
+            <div class="day-name">Do</div>
+            <div class="day-name">Fr</div>
+            <div class="day-name">Sa</div>
+            <div class="day-name">So</div>
+        `;
+
+        const firstDayIndex = (new Date(year, month, 1).getDay() + 6) % 7; 
+        const totalDays = new Date(year, month + 1, 0).getDate();
+
+        // Leere Felder am Monatsanfang
+        for (let i = 0; i < firstDayIndex; i++) {
+            const emptyCell = document.createElement('div');
+            emptyCell.classList.add('calendar-day', 'empty');
+            calendarGrid.appendChild(emptyCell);
+        }
+
+        // Tage des Monats render
+        for (let day = 1; day <= totalDays; day++) {
+            const dayCell = document.createElement('div');
+            dayCell.classList.add('calendar-day');
+            
+            const formattedMonth = String(month + 1).padStart(2, '0');
+            const formattedDay = String(day).padStart(2, '0');
+            const dateString = `${year}-${formattedMonth}-${formattedDay}`;
+
+            dayCell.innerHTML = `<span class="day-number">${day}</span>`;
+
+            // Prüfen ob Events an diesem Tag existieren
+            const dayEvents = events.filter(e => e.date === dateString);
+            if (dayEvents.length > 0) {
+                dayCell.classList.add('has-event');
+                const indicator = document.createElement('div');
+                indicator.classList.add('event-indicator');
+                dayCell.appendChild(indicator);
+            }
+
+            dayCell.addEventListener('click', () => {
+                eventModal.style.display = 'block';
+                eventDateInput.value = dateString;
+            });
+
+            calendarGrid.appendChild(dayCell);
+        }
+    }
+
+    function renderEventsList() {
+        eventList.innerHTML = '';
+        if (events.length === 0) {
+            eventList.innerHTML = '<p class="no-events">Keine Termine eingetragen.</p>';
+            return;
+        }
+
+        // Nach Datum sortieren
+        const sortedEvents = [...events].sort((a, b) => new Date(a.date) - new Date(b.date));
+
+        sortedEvents.forEach(ev => {
+            const item = document.createElement('div');
+            item.classList.add('event-item');
+            item.innerHTML = `
+                <div class="event-info">
+                    <h4>${escapeHTML(ev.title)}</h4>
+                    <p>${ev.date} ${ev.time ? 'um ' + ev.time : ''}</p>
+                </div>
+                <button class="delete-event-btn" data-id="${ev.id}">&times;</button>
+            `;
+            eventList.appendChild(item);
+        });
+
+        // Event Löschen Buttons verknüpfen
+        document.querySelectorAll('.delete-event-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const id = Number(e.target.getAttribute('data-id'));
+                events = events.filter(ev => ev.id !== id);
+                saveEvents(events);
+                renderCalendar();
+                renderEventsList();
+            });
+        });
+    }
+
+    // --- HELPER FUNCTIONS ---
+    function getCurrentTime() {
+        const now = new Date();
+        return now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function escapeHTML(str) {
+        return str.replace(/[&<>'"]/g, 
+            tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
+        );
+    }
+
+    function loadEvents() {
+        const saved = localStorage.getItem('nova_events');
+        return saved ? JSON.parse(saved) : [
+            { id: 1, title: 'Projekt-Meeting', date: '2026-06-10', time: '10:00' },
+            { id: 2, title: 'Sport', date: '2026-06-12', time: '18:30' }
+        ];
+    }
+
+    function saveEvents(evs) {
+        localStorage.setItem('nova_events', JSON.stringify(evs));
+    }
 });
-$('exportCalendarBtn').addEventListener('click', downloadIcs);
-
-
-function getEvents() {
-  try {
-    const stored = JSON.parse(localStorage.getItem(KEY) || '[]');
-    return Array.isArray(stored)
-      ? stored.filter(event =>
-          event &&
-          typeof event.id === 'string' &&
-          typeof event.title === 'string' &&
-          typeof event.date === 'string' &&
-          /^\d{4}-\d{2}-\d{2}$/.test(event.date) &&
-          (typeof event.time === 'string' || event.time === '')
-        )
-      : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveEvents(events) {
-  try {
-    localStorage.setItem(KEY, JSON.stringify(events));
-    renderEvents();
-    return true;
-  } catch {
-    alert('Die Termine konnten nicht gespeichert werden. Möglicherweise ist der Browser-Speicher voll oder deaktiviert.');
-    return false;
-  }
-}
-
-function renderEvents() {
-  const events = getEvents().sort((a, b) =>
-    (a.date + (a.time || '')) .localeCompare(b.date + (b.time || ''))
-  );
-  const list = $('eventList');
-  list.replaceChildren();
-
-  if (!events.length) {
-    const empty = document.createElement('div');
-    empty.className = 'empty';
-    empty.textContent = 'Noch keine Termine gespeichert.';
-    list.append(empty);
-    return;
-  }
-
-  events.forEach(event => {
-    const item = document.createElement('div');
-    item.className = 'event-item';
-
-    const main = document.createElement('div');
-    const title = document.createElement('div');
-    title.className = 'event-main';
-    title.textContent = event.title;
-
-    const time = document.createElement('div');
-    time.className = 'event-time';
-    const readableDate = shortDateFmt.format(new Date(`${event.date}T12:00:00`));
-    time.textContent = readableDate + (event.time ? ` · ${event.time}` : '');
-
-    main.append(title, time);
-
-    const del = document.createElement('button');
-    del.className = 'delete-event';
-    del.type = 'button';
-    del.textContent = '×';
-    del.setAttribute('aria-label', `Termin ${event.title} löschen`);
-    del.addEventListener('click', () => {
-      saveEvents(getEvents().filter(entry => entry.id !== event.id));
-    });
-
-    item.append(main, del);
-    list.append(item);
-  });
-}
-
-$('eventForm').addEventListener('submit', event => {
-  event.preventDefault();
-  const title = $('eventTitle').value.trim();
-  const date = $('eventDate').value;
-  const time = $('eventTime').value;
-
-  if (!title || !date) return;
-  if (date < toLocalDateValue()) {
-    alert('Bitte wähle ein heutiges oder zukünftiges Datum.');
-    $('eventDate').focus();
-    return;
-  }
-
-  const events = getEvents();
-  events.push({
-    id: globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-    title,
-    date,
-    time
-  });
-
-  if (saveEvents(events)) {
-    $('eventTitle').value = '';
-    $('eventTime').value = '';
-    $('eventDate').value = toLocalDateValue();
-  }
-});
-
-$('clearDataBtn').addEventListener('click', () => {
-  if (!confirm('Möchtest du wirklich alle lokal gespeicherten NOVA-Termine löschen?')) return;
-  try {
-    localStorage.removeItem(KEY);
-    renderEvents();
-  } catch {
-    alert('Die lokalen Daten konnten nicht gelöscht werden.');
-  }
-});
-
-renderEvents();
-
-if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').catch(() => {
-      // The app remains usable if offline support cannot be registered.
-    });
-  });
-}
